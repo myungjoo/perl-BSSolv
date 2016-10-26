@@ -1103,6 +1103,60 @@ expander_expand(Expander *xp, Queue *in, Queue *out, Queue *inconfl)
 		break;
 	    }
 	}
+
+      /* prioritize suggests and recommends */
+      if (qq.count > 1 && (pool->solvables[id].recommends || pool->solvables[id].suggested))
+        {
+	  Id *rec, *sug;
+	  Queue qr, qs;
+	  Id q, p, reccomended, suggested;
+	  int i;
+
+	  queue_init(&qr);
+	  queue_init(&qs);
+
+          for (i = 0; i < qq.count; i++)
+	    {
+	      rec = pool->solvables[id].repo->idarraydata + pool->solvables[id].recommends;
+	      sug = pool->solvables[id].repo->idarraydata + pool->solvables[id].suggests;
+	      q = qq.elements[i];
+
+	      while ((p = *rec++) != 0)
+	        {
+		  if (p == q)
+		    {
+		      queue_push(&qr, p);
+		    }
+		}
+	      while ((p = *sug++) != 0)
+	        {
+		  if (p == q)
+		    {
+		      queue_push(&qr, p);
+		    }
+		}
+	    }
+
+	  /* Recommends has higher priority than suggests */
+	  if (qr.count > 0)
+	    {
+	      queue_empty(&qq);
+	      for (i = 0; i < qr.count; i++)
+	        {
+		  queue_push(&qq, qr.elements[i]);
+		}
+	    }
+	  else if (qs.count > 0)
+	    {
+	      queue_empty(&qq);
+	      for (i = 0; i < qs.count; i++)
+	        {
+		  queue_push(&qq, qs.elements[i]);
+		}
+	    }
+	  /* if qs == qr == 0, do not touch qq: nothing recommended or suggested */
+        }
+
       if (qq.count > 1)
 	{
 	  queue_push(&cerrors, ERROR_CHOICE);
@@ -5500,9 +5554,9 @@ expand(BSSolv::expander xp, ...)
 			id = out.elements[i + 1];
 			who = out.elements[i + 2];
 			if (who)
-		          sv = newSVpvf("have choice for %s needed by %s: %s", pool_dep2str(pool, id), pool_id2str(pool, pool->solvables[who].name), str);
+		          sv = newSVpvf("(BSSolve 2) have choice for %s needed by %s: %s", pool_dep2str(pool, id), pool_id2str(pool, pool->solvables[who].name), str);
 			else
-		          sv = newSVpvf("have choice for %s: %s", pool_dep2str(pool, id), str);
+		          sv = newSVpvf("(BSSolve 2) have choice for %s: %s", pool_dep2str(pool, id), str);
 			i = j + 1;
 		      }
 		    else
