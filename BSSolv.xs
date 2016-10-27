@@ -64,11 +64,6 @@ static Id buildservice_dodcookie;
 
 #define REPOCOOKIE "buildservice repo 1.1"
 
-int debug_global_count1 = 0;
-int debug_global_count2 = 0;
-int debug_global_count3 = 0;
-int debug_global_count4 = 0;
-
 static int
 myrepowritefilter(Repo *repo, Repokey *key, void *kfdata)
 {
@@ -371,18 +366,6 @@ data2solvables(Repo *repo, Repodata *data, HV *rhv)
       s->conflicts   = importdeps(hv, "conflicts", 9, repo);
       s->requires    = importdeps(hv, "requires", 8, repo);
       s->recommends  = importdeps(hv, "recommends", 10, repo);
-      if (s->recommends > 0)
-        {
-	  printf("recommend > 0 found..\n");
-	  debug_global_count1++;
-	  fflush(stdout);
-	}
-      else
-        {
-	  printf("recommend = 0 found..\n");
-	  debug_global_count2++;
-	  fflush(stdout);
-	}
       s->suggests    = importdeps(hv, "suggests", 8, repo);
       s->supplements = importdeps(hv, "supplements", 11, repo);
       s->enhances    = importdeps(hv, "enhances", 8, repo);
@@ -610,7 +593,6 @@ expander_installed(Expander *xp, Id p, Map *installed, Map *conflicts, Queue *co
     }
   if (s->requires)
     {
-      debug_global_count3++;
       reqp = s->repo->idarraydata + s->requires;
       while ((req = *reqp++) != 0)
 	{
@@ -5575,9 +5557,9 @@ expand(BSSolv::expander xp, ...)
 			id = out.elements[i + 1];
 			who = out.elements[i + 2];
 			if (who)
-		          sv = newSVpvf("(BSSolve 2.1 %d/%d) have choice for %s needed by %s: %s", debug_global_count1, debug_global_count2, pool_dep2str(pool, id), pool_id2str(pool, pool->solvables[who].name), str);
+		          sv = newSVpvf("(BSSolve 2.2) have choice for %s needed by %s: %s", pool_dep2str(pool, id), pool_id2str(pool, pool->solvables[who].name), str);
 			else
-		          sv = newSVpvf("(BSSolve 2.1 %d/%d) have choice for %s: %s", debug_global_count1, debug_global_count2, pool_dep2str(pool, id), str);
+		          sv = newSVpvf("(BSSolve 2.2) have choice for %s: %s", pool_dep2str(pool, id), str);
 			i = j + 1;
 		      }
 		    else
