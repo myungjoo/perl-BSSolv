@@ -608,45 +608,6 @@ expander_installed(Expander *xp, Id p, Map *installed, Map *conflicts, Queue *co
 	    }
 	}
     }
-  if (s->recommends)
-    {
-      debug_global_count4++;
-      reqp = s->repo->idarraydata + s->recommends;
-      xp->debug = 1;
-      expander_dbg(xp, "%s:%d] Recommended by: %s\n", __func__, __LINE__, pool_id2str(pool, s->name));
-      while ((req = *reqp++) != 0)
-	{
-	  expander_dbg(xp, "%s:%d] recommended: %s\n", __func__, __LINE__, pool_id2str(pool, req));
-	  id = id2name(pool, req);
-	  if (!xp->ignoreignore)
-	    {
-	      if (MAPTST(&xp->ignored, id))
-		continue;
-	      if (MAPTST(&xp->ignoredx, id))
-		{
-		  Id xid = pool_str2id(pool, pool_tmpjoin(pool, pool_id2str(pool, s->name), ":", pool_id2str(pool, id)), 0);
-		  if (xid && MAPTST(&xp->ignored, xid))
-		    continue;
-		}
-	    }
-	  n = pool_id2str(pool, id);
-	  if (!strncmp(n, "rpmlib(", 7))
-	    {
-	      MAPEXP(&xp->ignored, id);
-	      MAPSET(&xp->ignored, id);
-	      continue;
-	    }
-	  if (*n == '/')
-	    {
-	      if (!xp->havefileprovides || pool->whatprovides[id] <= 1)
-		{
-		  MAPEXP(&xp->ignored, id);
-		  MAPSET(&xp->ignored, id);
-		  continue;
-		}
-	    }
-	}
-    }
   if (s->requires)
     {
       debug_global_count3++;
@@ -1161,115 +1122,64 @@ expander_expand(Expander *xp, Queue *in, Queue *out, Queue *inconfl)
 	    }
 	}
 
-      if (qq.count > 3)
-        {
-	  Id *recp;
-	  Id rec;
-
-	  Solvable *t = pool->solvables + who;
-
-	  xp->debug = 1;
-	  expander_dbg(xp, "qq.count = %d / rec = %d / sug = %d | dbg %d.%d.%d.%d | n %s\n",
-		qq.count,
-	  	pool->solvables[id].recommends,
-		pool->solvables[id].suggests,
-		debug_global_count1,
-		debug_global_count2,
-		debug_global_count3,
-		debug_global_count4,
-		pool_id2str(pool, t->name)
-		);
-	  expander_dbg(xp, "[%s] %s, %s, %s\n", pool_dep2str(pool, id), pool_dep2str(pool, who), pool_id2str(pool, id), pool_id2str(pool, who));
-
-	  for (i = 0; i < qq.count; i++)
-	    {
-	      expander_dbg(xp, "candidates: %s\n", expander_solvid2name(xp, qq.elements[i]));
-	    }
-
-	  recp = t->repo->idarraydata + t->recommends;
-	  while ((rec = *recp++) != 0)
-	    {
-	      expander_dbg(xp, "%s:%d] %s\n", __func__, __LINE__, pool_id2str(pool, rec));
-	    }
-	  expander_dbg(xp, "who: rec %d / sug %d\n",
-	  	pool->solvables[who].recommends,
-		pool->solvables[who].suggests);
-
-	}
       /* prioritize suggests and recommends */
       if (qq.count > 1 && (pool->solvables[who].recommends || pool->solvables[who].suggests))
         {
-	  Solvable *t = pool->solvables + who;
-	  Id *rec, *sug;
-	  Queue qr, qs;
-	  Id q, p, reccomended, suggested;
-	  int i;
+          Solvable *t = pool->solvables + who;
+          Id *rec, *sug;
+          Queue qr, qs;
+          Id q, p, reccomended, suggested;
+          int i;
 
-	  xp->debug = 1;
-	  expander_dbg(xp, "\n\n!! Trying recommend/suggests...\n\n");
-
-	  queue_init(&qr);
-	  queue_init(&qs);
+          queue_init(&qr);
+          queue_init(&qs);
 
           for (i = 0; i < qq.count; i++)
-	    {
-	      rec = t->repo->idarraydata + t->recommends;
-	      sug = t->repo->idarraydata + t->suggests;
-	      q = qq.elements[i];
+            {
+              rec = t->repo->idarraydata + t->recommends;
+              sug = t->repo->idarraydata + t->suggests;
+              q = qq.elements[i];
 
-	      expander_dbg(xp, "Validating %s[%s] %d->%d\n", expander_solvid2name(xp, q),
-	      		pool_id2str(pool, pool->solvables[q].name), q, pool->solvables[q].name);
+              while ((p = *rec++) != 0)
+                {
+                  if (!strncmp(pool_id2str(pool, p), pool_id2str(pool, pool->solvables[q].name), 32))
+                    {
+                      queue_push(&qr, q);
+                    }
+                }
+              while ((p = *sug++) != 0)
+                {
+                  if (!strncmp(pool_id2str(pool, p), pool_id2str(pool, pool->solvables[q].name), 32))
+                    {
+                      queue_push(&qs, q);
+                    }
+                }
+            }
 
-	      while ((p = *rec++) != 0)
-	        {
-	          expander_dbg(xp, "Comp rec: %d(%s)\n", p, pool_id2str(pool, p));
-		  if (!strncmp(pool_id2str(pool, p), pool_id2str(pool, pool->solvables[q].name), 32))
-		    {
-		     expander_dbg(xp, "BINGO!\n");
-		      queue_push(&qr, q);
-		    }
-		}
-	      while ((p = *sug++) != 0)
-	        {
-	          expander_dbg(xp, "Comp sug: %d(%s)\n", p, pool_id2str(pool, p));
-		  if (!strncmp(pool_id2str(pool, p), pool_id2str(pool, pool->solvables[q].name), 32))
-		    {
-		     expander_dbg(xp, "BINGO!\n");
-		      queue_push(&qs, q);
-		    }
-		}
-	    }
-
-	  /* Recommends has higher priority than suggests */
-	  if (qr.count > 0)
-	    {
-	      queue_empty(&qq);
-	      for (i = 0; i < qr.count; i++)
-	        {
-		  queue_push(&qq, qr.elements[i]);
-		}
-	      expander_dbg(xp, "qr used: %d\n", qr.count);
-	    }
-	  else if (qs.count > 0)
-	    {
-	      queue_empty(&qq);
-	      for (i = 0; i < qs.count; i++)
-	        {
-		  queue_push(&qq, qs.elements[i]);
-		}
-	      expander_dbg(xp, "qs used: %d\n", qs.count);
-	    }
-	  else {
-	      expander_dbg(xp, "noone used: %d/%d\n", qr.count, qs.count);
-	    }
-	  /* if qs == qr == 0, do not touch qq: nothing recommended or suggested */
+          /* Recommends has higher priority than suggests */
+          if (qr.count > 0)
+            {
+              queue_empty(&qq);
+              for (i = 0; i < qr.count; i++)
+                {
+                  queue_push(&qq, qr.elements[i]);
+                }
+          }
+          else if (qs.count > 0)
+          {
+              queue_empty(&qq);
+              for (i = 0; i < qs.count; i++)
+                {
+                  queue_push(&qq, qs.elements[i]);
+                }
+          }
+          else {
+          }
+          /* if qs == qr == 0, do not touch qq: nothing recommended or suggested */
         }
 
       if (qq.count > 1)
 	{
-	  xp->debug = 1;
-	  expander_dbg(xp, "\n\n!! NOOOOOO...\n\n");
-
 	  queue_push(&cerrors, ERROR_CHOICE);
 	  queue_push2(&cerrors, id, who);
 	  for (i = 0; i < qq.count; i++)
